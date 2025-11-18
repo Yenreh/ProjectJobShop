@@ -1,0 +1,300 @@
+{% extends "layout.html" %}
+
+{% block title %}Configuración - Job Shop Scheduler{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- Paso 1: Selección de Modelo -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0"><i class="bi bi-1-circle-fill"></i> Seleccionar Tipo de Modelo</h5>
+        </div>
+        <div class="card-body">
+            <div class="mb-3">
+                <label for="model" class="form-label fw-bold">Modelo de Optimización</label>
+                <select id="model" class="form-select form-select">
+                    <option value="">-- Selecciona un modelo --</option>
+                    {% set categories = {} %}
+                    {% for key, model in models.items() %}
+                        {% if model.category not in categories %}
+                            {% set _ = categories.update({model.category: []}) %}
+                        {% endif %}
+                        {% set _ = categories[model.category].append((key, model)) %}
+                    {% endfor %}
+                    
+                    {% for category, model_list in categories.items() %}
+                    <optgroup label="{{ category }}">
+                        {% for key, model in model_list %}
+                        <option value="{{ key }}" 
+                                data-description="{{ model.description }}"
+                                data-type="{{ model.type }}"
+                                {% if selected_model == key %}selected{% endif %}>
+                            {{ model.name }}
+                        </option>
+                        {% endfor %}
+                    </optgroup>
+                    {% endfor %}
+                </select>
+                <div class="form-text mt-2" id="model-description"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Paso 2: Selección de Datos (inicialmente oculto) -->
+    <div class="card shadow-sm mb-4" id="data-selection-card" style="display: none;">
+        <div class="card-header bg-success text-white">
+            <h5 class="mb-0"><i class="bi bi-2-circle-fill"></i> Seleccionar Datos del Problema</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <!-- Opción A: Tests Precargados -->
+                <div class="col-md-6">
+                    <div class="border rounded p-3 h-100">
+                        <h6 class="text-success"><i class="bi bi-folder"></i> Tests Precargados</h6>
+                        <form action="{{ url_for('load_test') }}" method="post" id="test-form">
+                            <input type="hidden" name="model" id="test-model-input">
+                            <div class="mb-3">
+                                <label for="test-file" class="form-label">Archivo de test</label>
+                                <select name="test_file" id="test-file" class="form-select" required>
+                                    <option value="">-- Selecciona un test --</option>
+                                </select>
+                                <div class="form-text">Tests disponibles para el modelo seleccionado</div>
+                            </div>
+                            <button type="submit" class="btn btn-success w-100">
+                                <i class="bi bi-check-circle"></i> Usar este Test
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                
+                <!-- Opción B: Subir Archivo -->
+                <div class="col-md-6">
+                    <div class="border rounded p-3 h-100">
+                        <h6 class="text-primary"><i class="bi bi-upload"></i> Subir Archivo Personalizado</h6>
+                        <form action="{{ url_for('upload_file') }}" method="post" enctype="multipart/form-data" id="upload-form">
+                            <div class="mb-3">
+                                <label for="file" class="form-label">Archivo .dzn</label>
+                                <input type="file" class="form-control" id="file" name="file" accept=".dzn" required>
+                                <div class="form-text">Carga tu propio archivo de datos</div>
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="bi bi-upload"></i> Cargar Archivo
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Paso 3: Configuración y Ejecución (visible solo si hay datos cargados) -->
+    {% if uploaded_file %}
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-info text-white">
+            <h5 class="mb-0"><i class="bi bi-3-circle-fill"></i> Configurar y Ejecutar</h5>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-success">
+                <i class="bi bi-check-circle"></i> Archivo cargado: <strong>{{ uploaded_file }}</strong>
+            </div>
+            
+            <form action="{{ url_for('run_model') }}" method="post" id="execute-form">
+                <input type="hidden" name="model" id="execute-model-input" value="{{ selected_model }}">
+                
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="solver" class="form-label">Solver</label>
+                        <select name="solver" id="solver" class="form-select">
+                            {% for key, name in solvers.items() %}
+                            <option value="{{ key }}" {% if selected_solver == key %}selected{% endif %}>{{ name }}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">Selecciona el solver de optimización</div>
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <label for="timeout" class="form-label">Tiempo límite (segundos)</label>
+                        <input type="number" name="timeout" id="timeout" class="form-control" value="60" min="10" max="600">
+                        <div class="form-text">Tiempo máximo de ejecución</div>
+                    </div>
+                </div>
+
+                <div id="loading-indicator" class="alert alert-info" style="display: none;">
+                    <div class="d-flex align-items-center">
+                        <div class="spinner-border spinner-border-sm me-2" role="status">
+                            <span class="visually-hidden">Cargando...</span>
+                        </div>
+                        <strong>Ejecutando solver...</strong> Esto puede tardar varios segundos.
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-info btn w-100" id="execute-btn">
+                    <i class="bi bi-play-fill"></i> Ejecutar Solver
+                </button>
+            </form>
+
+            <!-- Vista previa del archivo -->
+            <div class="mt-4">
+                <h6>Vista previa del archivo:</h6>
+                <pre class="border rounded p-3 bg-light" style="max-height: 400px; overflow-y: auto;"><code>{{ dzn_content }}</code></pre>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Información de Ayuda -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-dark text-white">
+            <h5 class="mb-0"><i class="bi bi-info-circle"></i> Información sobre los Modelos</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <div class="border rounded p-3 h-100 bg-light">
+                        <h6 class="text-primary"><i class="bi bi-people"></i> Operarios Limitados</h6>
+                        <p class="small">Modela el problema cuando hay un número limitado k de operarios disponibles.</p>
+                        <ul class="small mb-0">
+                            <li><strong>Variante 1:</strong> Búsqueda libre</li>
+                            <li><strong>Variante 2:</strong> dom_w_deg + first_fail</li>
+                            <li><strong>Variante 3:</strong> Operario primero</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="col-md-4 mb-3">
+                    <div class="border rounded p-3 h-100 bg-light">
+                        <h6 class="text-success"><i class="bi bi-star"></i> Habilidades de Operarios</h6>
+                        <p class="small">Operarios con habilidades específicas. Solo pueden ejecutar tareas para las que están calificados.</p>
+                        <ul class="small mb-0">
+                            <li><strong>Variante 1:</strong> Búsqueda libre</li>
+                            <li><strong>Variante 2:</strong> dom_w_deg + first_fail</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="col-md-4 mb-3">
+                    <div class="border rounded p-3 h-100 bg-light">
+                        <h6 class="text-warning"><i class="bi bi-tools"></i> Mantenimiento</h6>
+                        <p class="small">Job Shop con ventanas de mantenimiento programado en máquinas.</p>
+                        <ul class="small mb-0">
+                            <li><strong>Variante 1:</strong> Solución directa</li>
+                            <li><strong>Variante 2:</strong> First-fail</li>
+                            <li><strong>Variante 3:</strong> Input order random</li>
+                            <li><strong>Variante 4:</strong> Búsqueda por jobs</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if uploaded_file %}
+    <div class="text-center mt-4">
+        <a href="{{ url_for('clear_session') }}" class="btn btn-outline-danger">
+            <i class="bi bi-trash"></i> Limpiar Sesión
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+// Descripciones de modelos
+const modelDescriptions = {
+    {% for key, model in models.items() %}
+    "{{ key }}": "{{ model.description }}",
+    {% endfor %}
+};
+
+// Referencias a elementos del DOM
+const modelSelect = document.getElementById('model');
+const descriptionText = document.getElementById('model-description');
+const dataSelectionCard = document.getElementById('data-selection-card');
+const testFileSelect = document.getElementById('test-file');
+const testModelInput = document.getElementById('test-model-input');
+const executeModelInput = document.getElementById('execute-model-input');
+
+// Variable para evitar bucle infinito
+let isChangingModel = false;
+
+// Cuando se selecciona un modelo
+if (modelSelect) {
+    modelSelect.addEventListener('change', async function() {
+        const selectedModel = this.value;
+        
+        // Evitar bucle si ya estamos procesando un cambio
+        if (isChangingModel) {
+            return;
+        }
+        
+        if (selectedModel) {
+            // Verificar si el modelo cambió realmente
+            const currentModel = '{{ selected_model }}';
+            if (currentModel && currentModel !== selectedModel) {
+                // Solo limpiar y recargar si cambió de modelo
+                isChangingModel = true;
+                try {
+                    await fetch('/api/clear_test_data', { method: 'POST' });
+                    window.location.href = '/?model=' + selectedModel;
+                    return;
+                } catch (error) {
+                    console.error('Error limpiando datos:', error);
+                    isChangingModel = false;
+                }
+            }
+            
+            // Mostrar descripción
+            if (modelDescriptions[selectedModel]) {
+                descriptionText.innerHTML = `<i class="bi bi-info-circle-fill text-primary"></i> ${modelDescriptions[selectedModel]}`;
+            }
+            
+            // Mostrar sección de datos
+            dataSelectionCard.style.display = 'block';
+            
+            // Actualizar input hidden
+            testModelInput.value = selectedModel;
+            if (executeModelInput) {
+                executeModelInput.value = selectedModel;
+            }
+            
+            // Cargar tests disponibles
+            try {
+                const response = await fetch(`/api/get_tests/${selectedModel}`);
+                const data = await response.json();
+                
+                testFileSelect.innerHTML = '<option value="">-- Selecciona un test --</option>';
+                data.tests.forEach(test => {
+                    const option = document.createElement('option');
+                    option.value = test;
+                    option.textContent = test;
+                    testFileSelect.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error cargando tests:', error);
+                testFileSelect.innerHTML = '<option value="">Error cargando tests</option>';
+            }
+        } else {
+            descriptionText.textContent = '';
+            dataSelectionCard.style.display = 'none';
+        }
+    });
+    
+    // Trigger inicial si hay modelo seleccionado
+    if (modelSelect.value) {
+        modelSelect.dispatchEvent(new Event('change'));
+    }
+}
+
+// Mostrar indicador de carga al enviar formulario
+const executeForm = document.getElementById('execute-form');
+const loadingIndicator = document.getElementById('loading-indicator');
+const executeBtn = document.getElementById('execute-btn');
+
+if (executeForm) {
+    executeForm.addEventListener('submit', function() {
+        loadingIndicator.style.display = 'block';
+        executeBtn.disabled = true;
+        executeBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Ejecutando...';
+    });
+}
+</script>
+{% endblock %}

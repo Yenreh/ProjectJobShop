@@ -1,0 +1,364 @@
+{% extends "layout.html" %}
+
+{% block title %}Comparar Estrategias - Job Shop Scheduler{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col">
+            <h2><i class="bi bi-bar-chart-line"></i> Comparación de Estrategias</h2>
+            <p class="text-muted">Compara el rendimiento de diferentes modelos y estrategias de búsqueda</p>
+        </div>
+    </div>
+
+    <!-- Configuración de comparación -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0"><i class="bi bi-gear"></i> Configurar Comparación</h5>
+        </div>
+        <div class="card-body">
+            <form action="{{ url_for('run_comparison') }}" method="post" id="compare-form">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="test-file-compare" class="form-label">Archivo de test</label>
+                        <select name="test_file" id="test-file-compare" class="form-select" required>
+                            <option value="">-- Selecciona un test --</option>
+                        </select>
+                    </div>
+                    
+                    <div class="col-md-3 mb-3">
+                        <label for="solver-compare" class="form-label">Solver</label>
+                        <select name="solver" id="solver-compare" class="form-select">
+                            {% for key, name in solvers.items() %}
+                            <option value="{{ key }}">{{ name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="col-md-3 mb-3">
+                        <label for="timeout-compare" class="form-label">Timeout (seg)</label>
+                        <input type="number" name="timeout" id="timeout-compare" class="form-control" value="60" min="10" max="300">
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Selecciona modelos a comparar (mínimo 2):</label>
+                    
+                    <!-- Operarios Limitados -->
+                    <div class="card mb-3">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0">Operarios Limitados (Op Limit)</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                {% for key, model in models.items() if model.type == 'op_limit' %}
+                                <div class="col-md-12 mb-2">
+                                    <div class="form-check">
+                                        <input class="form-check-input model-checkbox" type="checkbox" name="models" value="{{ key }}" id="model-{{ key }}" data-type="op_limit">
+                                        <label class="form-check-label" for="model-{{ key }}">
+                                            <strong>{{ model.name }}</strong>
+                                            <br><small class="text-muted">{{ model.description }}</small>
+                                        </label>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Habilidades de Operarios -->
+                    <div class="card mb-3">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0">Habilidades de Operarios (Workers Skills)</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                {% for key, model in models.items() if model.type == 'workers_skills' %}
+                                <div class="col-md-12 mb-2">
+                                    <div class="form-check">
+                                        <input class="form-check-input model-checkbox" type="checkbox" name="models" value="{{ key }}" id="model-{{ key }}" data-type="workers_skills">
+                                        <label class="form-check-label" for="model-{{ key }}">
+                                            <strong>{{ model.name }}</strong>
+                                            <br><small class="text-muted">{{ model.description }}</small>
+                                        </label>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Mantenimiento -->
+                    <div class="card mb-3">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0">Mantenimiento de Máquinas (Maintenance)</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                {% for key, model in models.items() if model.type == 'maintenance' %}
+                                <div class="col-md-12 mb-2">
+                                    <div class="form-check">
+                                        <input class="form-check-input model-checkbox" type="checkbox" name="models" value="{{ key }}" id="model-{{ key }}" data-type="maintenance">
+                                        <label class="form-check-label" for="model-{{ key }}">
+                                            <strong>{{ model.name }}</strong>
+                                            <br><small class="text-muted">{{ model.description }}</small>
+                                        </label>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn w-100">
+                    <i class="bi bi-play-circle"></i> Ejecutar Comparación
+                </button>
+            </form>
+        </div>
+    </div>
+
+    {% if comparison_results %}
+    <!-- Resultados de comparación -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="bi bi-trophy"></i> Resultados de la Comparación</h5>
+            <a href="{{ url_for('export_comparison_csv') }}" class="btn btn-light">
+                <i class="bi bi-download"></i> Exportar CSV
+            </a>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-info">
+                <strong>Archivo de test:</strong> {{ comparison_results.test_file }}
+                <br><strong>Solver:</strong> {{ comparison_results.solver }}
+                <br><strong>Modelos ejecutados:</strong> {{ comparison_results.results|length }}
+            </div>
+
+            <!-- Agrupar resultados por tipo -->
+            {% set results_by_type = {} %}
+            {% for result in comparison_results.results %}
+                {% set model_type = result.model_type %}
+                {% if model_type not in results_by_type %}
+                    {% set _ = results_by_type.update({model_type: []}) %}
+                {% endif %}
+                {% set _ = results_by_type[model_type].append(result) %}
+            {% endfor %}
+
+            <!-- Mostrar resultados por tipo -->
+            {% for type_name, type_label in [('op_limit', 'Operarios Limitados'), ('workers_skills', 'Habilidades de Operarios'), ('maintenance', 'Mantenimiento')] %}
+            {% if type_name in results_by_type %}
+            <div class="card mb-4">
+                <div class="card-header {% if type_name == 'op_limit' %}bg-primary{% elif type_name == 'workers_skills' %}bg-success{% else %}bg-info{% endif %} text-white">
+                    <h5 class="mb-0">{{ type_label }}</h5>
+                </div>
+                <div class="card-body">
+                    <!-- Tabla comparativa para este tipo -->
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Ranking</th>
+                                    <th>Estrategia</th>
+                                    <th>Makespan</th>
+                                    <th>Tiempo (seg)</th>
+                                    {% if type_name in ['op_limit', 'workers_skills'] %}
+                                    <th>Desbalance</th>
+                                    <th>Carga Max</th>
+                                    <th>Carga Min</th>
+                                    {% endif %}
+                                    <th>Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for result in results_by_type[type_name] %}
+                                <tr {% if loop.index == 1 and result.success %}class="table-success"{% elif not result.success %}class="table-danger"{% endif %}>
+                                    <td class="text-center">
+                                        {% if loop.index == 1 and result.success %}
+                                        <i class="bi bi-trophy-fill text-warning fs-5"></i>
+                                        {% elif not result.success %}
+                                        <i class="bi bi-x-circle-fill text-danger"></i>
+                                        {% else %}
+                                        <strong>#{{ loop.index }}</strong>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <strong>{{ result.model_name }}</strong>
+                                        {% if not result.success %}
+                                        <br><small class="text-danger">{{ result.status }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">
+                                        {% if result.success %}
+                                        <strong class="{% if loop.index == 1 %}text-success fs-5{% endif %}">
+                                            {{ result.makespan }}
+                                        </strong>
+                                        {% else %}
+                                        <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">{{ result.execution_time }}</td>
+                                    {% if type_name in ['op_limit', 'workers_skills'] %}
+                                    <td class="text-center">
+                                        {% if result.get('imbalance') is not none %}
+                                        <span class="badge {% if result.imbalance <= 1 %}bg-success{% elif result.imbalance <= 3 %}bg-warning{% else %}bg-danger{% endif %}">
+                                            {{ result.imbalance }}
+                                        </span>
+                                        {% else %}
+                                        <span class="text-muted">N/A</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">
+                                        {% if result.get('max_load') is not none %}
+                                        {{ result.max_load }}
+                                        {% else %}
+                                        <span class="text-muted">N/A</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">
+                                        {% if result.get('min_load') is not none %}
+                                        {{ result.min_load }}
+                                        {% else %}
+                                        <span class="text-muted">N/A</span>
+                                        {% endif %}
+                                    </td>
+                                    {% endif %}
+                                    <td class="text-center">
+                                        <span class="badge {% if 'OPTIMAL' in result.status %}bg-success{% elif 'SATISFIED' in result.status %}bg-info{% elif 'ERROR' in result.status %}bg-danger{% else %}bg-warning{% endif %}">
+                                            {{ result.status }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Distribución de carga para modelos de este tipo -->
+                    {% if type_name in ['op_limit', 'workers_skills'] %}
+                    {% for result in results_by_type[type_name] %}
+                    {% if result.success and (result.get('operator_load') or result.get('worker_load')) %}
+                    <div class="card mt-3 border-secondary">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0">
+                                {{ result.model_name }} - Distribución de Carga
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                {% if result.get('operator_load') %}
+                                {% for load in result.operator_load %}
+                                <div class="col-md-2 mb-2">
+                                    <div class="text-center">
+                                        <small class="text-muted">Op {{ loop.index }}</small>
+                                        <div class="progress" style="height: 25px;">
+                                            <div class="progress-bar {% if load == result.max_load %}bg-danger{% elif load == result.min_load %}bg-success{% else %}bg-primary{% endif %}" 
+                                                 role="progressbar" 
+                                                 style="width: {{ (load / result.max_load * 100) if result.max_load > 0 else 0 }}%">
+                                                {{ load }}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                                {% elif result.get('worker_load') %}
+                                {% for load in result.worker_load %}
+                                <div class="col-md-2 mb-2">
+                                    <div class="text-center">
+                                        <small class="text-muted">W {{ loop.index }}</small>
+                                        <div class="progress" style="height: 25px;">
+                                            <div class="progress-bar {% if load == result.max_load %}bg-danger{% elif load == result.min_load %}bg-success{% else %}bg-info{% endif %}" 
+                                                 role="progressbar" 
+                                                 style="width: {{ (load / result.max_load * 100) if result.max_load > 0 else 0 }}%">
+                                                {{ load }}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+            {% endfor %}
+
+            <!-- Gráficos de comparación -->
+            <div class="row mt-4">
+                <div class="col-md-6">
+                    <h6>Comparación de Makespan</h6>
+                    {{ comparison_results.chart|safe }}
+                </div>
+                <div class="col-md-6">
+                    <h6>Comparación de Desbalance</h6>
+                    {{ comparison_results.imbalance_chart|safe }}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+// Cargar tests disponibles (usando primer modelo op_limit por defecto)
+const testSelect = document.getElementById('test-file-compare');
+const modelCheckboxes = document.querySelectorAll('.model-checkbox');
+
+// Función para manejar la selección de modelos por tipo
+function handleModelSelection() {
+    const checkedCheckboxes = Array.from(modelCheckboxes).filter(cb => cb.checked);
+    
+    if (checkedCheckboxes.length === 0) {
+        // Si no hay ninguno seleccionado, habilitar todos
+        modelCheckboxes.forEach(cb => {
+            cb.disabled = false;
+            cb.parentElement.parentElement.style.opacity = '1';
+        });
+        return;
+    }
+    
+    // Obtener el tipo del primer checkbox seleccionado
+    const selectedType = checkedCheckboxes[0].dataset.type;
+    
+    // Deshabilitar checkboxes de otros tipos
+    modelCheckboxes.forEach(cb => {
+        if (cb.dataset.type !== selectedType) {
+            cb.disabled = true;
+            cb.checked = false;
+            cb.parentElement.parentElement.style.opacity = '0.5';
+        } else {
+            cb.disabled = false;
+            cb.parentElement.parentElement.style.opacity = '1';
+        }
+    });
+}
+
+// Agregar event listener a todos los checkboxes
+modelCheckboxes.forEach(checkbox => {
+    checkbox.addEventListener('change', handleModelSelection);
+});
+
+async function loadTests() {
+    try {
+        const response = await fetch('/api/get_tests/jobshop_op_limit_1');
+        const data = await response.json();
+        
+        testSelect.innerHTML = '<option value="">-- Selecciona un test --</option>';
+        data.tests.forEach(test => {
+            const option = document.createElement('option');
+            option.value = test;
+            option.textContent = test;
+            testSelect.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Error cargando tests:', error);
+    }
+}
+
+loadTests();
+</script>
+{% endblock %}

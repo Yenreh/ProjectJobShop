@@ -1,0 +1,267 @@
+{% extends "layout.html" %}
+
+{% block title %}Resultados - Job Shop Scheduler{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- Header con estado -->
+    <div class="row mb-4">
+        <div class="col">
+            <h2 class="d-flex align-items-center">
+                <i class="bi bi-check-circle-fill text-success me-2"></i>
+                Resultados de la Optimización
+                <span class="badge {% if 'OPTIMAL' in results.status %}bg-success{% else %}bg-info{% endif %} ms-3">
+                    {{ results.status }}
+                </span>
+            </h2>
+        </div>
+    </div>
+
+    <!-- Tarjetas de resumen -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card border-primary shadow-sm summary-card">
+                <div class="card-body text-center">
+                    <h6 class="card-subtitle text-muted">
+                        <i class="bi bi-clock-history"></i> Makespan
+                    </h6>
+                    <h2 class="card-title text-primary mb-0">{{ results.makespan }}</h2>
+                    <small class="text-muted">Tiempo total</small>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card border-info shadow-sm summary-card">
+                <div class="card-body text-center">
+                    <h6 class="card-subtitle text-muted">
+                        <i class="bi bi-speedometer2"></i> Tiempo Ejecución
+                    </h6>
+                    <h4 class="card-title text-info mb-0">{{ results.execution_time }}</h4>
+                    <small class="text-muted">Solver: {{ results.solver }}</small>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card border-secondary shadow-sm summary-card">
+                <div class="card-body text-center">
+                    <h6 class="card-subtitle text-muted">
+                        <i class="bi bi-file-earmark-text"></i> Archivo
+                    </h6>
+                    <p class="card-text small mb-1"><code>{{ results.data_file }}</code></p>
+                    <small class="text-muted">Archivo de datos</small>
+                </div>
+            </div>
+        </div>
+        
+        {% if results.get('imbalance') is not none %}
+        <div class="col-md-3">
+            <div class="card border-warning shadow-sm summary-card">
+                <div class="card-body text-center">
+                    <h6 class="card-subtitle text-muted">
+                        <i class="bi bi-bar-chart"></i> Desbalance
+                    </h6>
+                    <h2 class="card-title text-warning mb-0">{{ results.imbalance }}</h2>
+                    <small class="text-muted">Max - Min carga</small>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Diagrama de Gantt -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-dark text-white">
+            <h5 class="mb-0"><i class="bi bi-bar-chart-line"></i> Diagrama de Gantt</h5>
+        </div>
+        <div class="card-body">
+            <div class="gantt-container">
+                {{ results.gantt_chart|safe }}
+            </div>
+        </div>
+    </div>
+
+    <!-- Tiempos de Inicio -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0"><i class="bi bi-table"></i> Tiempos de Inicio de Tareas</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover">
+                    <thead class="table-light">
+                    <tr>
+                        <th>Job</th>
+                        {% for task_idx in range(results.start_times[0]|length) %}
+                        <th>Máquina {{ task_idx + 1 }}</th>
+                        {% endfor %}
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for row in results.start_times %}
+                    <tr>
+                        <td class="table-active"><strong>Job {{ loop.index }}</strong></td>
+                        {% for start_time in row %}
+                        <td class="text-center">{{ start_time }}</td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {% if results.model_type == 'op_limit' %}
+    <!-- Asignación de Operarios -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-success text-white">
+            <h5 class="mb-0"><i class="bi bi-people"></i> Asignación de Operarios</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover">
+                    <thead class="table-light">
+                    <tr>
+                        <th>Job</th>
+                        {% for task_idx in range(results.operator_assignment[0]|length) %}
+                        <th>Máquina {{ task_idx + 1 }}</th>
+                        {% endfor %}
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for row in results.operator_assignment %}
+                    <tr>
+                        <td class="table-active"><strong>Job {{ loop.index }}</strong></td>
+                        {% for operator in row %}
+                        <td class="text-center">
+                            <span class="badge bg-primary">Op {{ operator }}</span>
+                        </td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Carga de Operarios -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-info text-white">
+            <h5 class="mb-0"><i class="bi bi-graph-up"></i> Carga de Operarios</h5>
+        </div>
+        <div class="card-body">
+            {% for load in results.operator_load %}
+            <div class="mb-3">
+                <div class="d-flex justify-content-between mb-1">
+                    <span class="fw-bold">Operario {{ loop.index }}</span>
+                    <span class="text-muted">{{ load }}</span>
+                </div>
+                <div class="progress" style="height: 25px;">
+                    <div class="progress-bar bg-primary" role="progressbar" 
+                         style="width: {{ (load / results.max_load * 100) if results.max_load > 0 else 0 }}%">
+                        {{ load }}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+            <div class="alert alert-info mt-3">
+                <i class="bi bi-info-circle"></i>
+                Carga máxima: <strong>{{ results.max_load }}</strong> | 
+                Carga mínima: <strong>{{ results.min_load }}</strong> | 
+                Desbalance: <strong>{{ results.imbalance }}</strong>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if results.model_type == 'workers_skills' %}
+    <!-- Asignación de Trabajadores -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-success text-white">
+            <h5 class="mb-0"><i class="bi bi-people"></i> Asignación de Trabajadores</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover">
+                    <thead class="table-light">
+                    <tr>
+                        <th>Job</th>
+                        {% for task_idx in range(results.worker_assignment[0]|length) %}
+                        <th>Máquina {{ task_idx + 1 }}</th>
+                        {% endfor %}
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for row in results.worker_assignment %}
+                    <tr>
+                        <td class="table-active"><strong>Job {{ loop.index }}</strong></td>
+                        {% for worker in row %}
+                        <td class="text-center">
+                            <span class="badge bg-success">W {{ worker }}</span>
+                        </td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Carga de Trabajadores -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-info text-white">
+            <h5 class="mb-0"><i class="bi bi-graph-up"></i> Carga de Trabajadores</h5>
+        </div>
+        <div class="card-body">
+            {% for load in results.worker_load %}
+            <div class="mb-3">
+                <div class="d-flex justify-content-between mb-1">
+                    <span class="fw-bold">Trabajador {{ loop.index }}</span>
+                    <span class="text-muted">{{ load }}</span>
+                </div>
+                <div class="progress" style="height: 25px;">
+                    <div class="progress-bar bg-success" role="progressbar" 
+                         style="width: {{ (load / results.max_load * 100) if results.max_load > 0 else 0 }}%">
+                        {{ load }}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+            <div class="alert alert-info mt-3">
+                <i class="bi bi-info-circle"></i>
+                Carga máxima: <strong>{{ results.max_load }}</strong> | 
+                Carga mínima: <strong>{{ results.min_load }}</strong>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if results.model_type == 'maintenance' %}
+    <!-- Info sobre Mantenimiento -->
+    <div class="alert alert-warning">
+        <i class="bi bi-tools"></i>
+        <strong>Modelo con Mantenimiento:</strong> Este modelo considera ventanas de mantenimiento programado 
+        en las máquinas. Las tareas no pueden ejecutarse durante estos períodos de mantenimiento.
+    </div>
+    {% endif %}
+
+    <!-- Botones de acción -->
+    <div class="row mt-4">
+        <div class="col text-center">
+            <a href="{{ url_for('export_csv') }}" class="btn btn-primary btn me-2">
+                <i class="bi bi-download"></i> Exportar CSV
+            </a>
+            <a href="{{ url_for('index') }}" class="btn btn-outline-secondary btn me-2">
+                <i class="bi bi-arrow-left"></i> Nueva Consulta
+            </a>
+            <a href="{{ url_for('clear_session') }}" class="btn btn-outline-danger btn">
+                <i class="bi bi-trash"></i> Limpiar Sesión
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,14 @@
+
+jobs = 5;
+tasks = 5;
+d = [| 1, 4, 5, 3, 6
+     | 3, 2, 7, 1, 2
+     | 4, 4, 4, 4, 4
+     | 1, 1, 1, 6, 8
+     | 7, 3, 2, 2, 1 |];
+
+% --- Mantenimientos (tres paros en total) ---
+Nbreaks = 3;
+brk_m = [2, 3, 5];    % máquinas afectadas (columnas j)
+brk_a = [3,12, 8];    % inicio del paro
+brk_b = [5,15,10];    % fin del paro (exclusivo en duración: len=b-a)
