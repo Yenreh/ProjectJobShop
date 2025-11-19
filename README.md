@@ -17,7 +17,7 @@ La herramienta proporciona:
 - Visualización interactiva con diagramas de Gantt por máquinas usando Plotly
 - Análisis de carga de operarios/trabajadores con métricas de desbalance
 - Comparación de estrategias de búsqueda agrupadas por tipo de modelo
-- Exportación de resultados en formato CSV con información detallada
+- Exportación de resultados en formato CSV y PDF profesional con información detallada
 
 ## Requisitos
 
@@ -108,6 +108,7 @@ ProjectJobShop/
 │   ├── minizinc_helper.py       # Operaciones con MiniZinc
 │   ├── data_helper.py           # Parsing de archivos .dzn
 │   ├── csv_helper.py            # Exportación CSV
+│   ├── pdf_helper.py            # Generación de PDFs profesionales
 │   └── visualization_helper.py  # Generación de gráficos Plotly
 ├── controllers/            # Controladores por tipo de modelo
 │   ├── controller_oplimit.py    # Extracción de resultados op_limit
@@ -142,7 +143,7 @@ ProjectJobShop/
 
 ## Modelos Disponibles
 
-### 1. Job Shop con Operarios Limitados (11 tests)
+### 1. Job Shop con Operarios Limitados (10 tests)
 
 Tres variaciones con diferentes estrategias de búsqueda:
 1. **Búsqueda Libre**: Sin estrategia definida (explora naturalmente)
@@ -153,7 +154,7 @@ Tres variaciones con diferentes estrategias de búsqueda:
 ```minizinc
 jobs = 5;
 tasks = 5;
-k = 3;  // número de operarios
+k = 3;  // número de operarios disponibles
 d = [| 1,4,5,3,6
      | 3,2,7,1,2
      | 4,4,4,4,4
@@ -169,13 +170,25 @@ Dos variaciones para modelar operarios especializados:
 
 **Formato de datos (.dzn):**
 ```minizinc
-JOB = {J1, J2, J3};
-TASK = {T1, T2, T3};
-d = [| 2, 3, 1
-     | 1, 4, 2
-     | 3, 2, 2 |];
+JOB = _(1..8);   // definición de jobs (puede ser rango o enumeración)
+TASK = _(1..6);  // definición de tareas
+d = [| 8, 7, 3, 6, 7, 4
+     | 2, 7, 5, 8, 6, 8
+     | 6, 1, 6, 4, 4, 7
+     | 1, 1, 1, 2, 7, 3
+     | 7, 3, 6, 5, 4, 5
+     | 3, 7, 7, 5, 8, 5
+     | 7, 5, 1, 8, 8, 3
+     | 8, 7, 5, 1, 4, 2 |];
 W = 4;  // número de trabajadores
-skills = [{1,2}, {2,3}, {1,3,4}];
+skills = [
+  {1,2,3,4},   % T1: trabajadores que pueden hacer tarea 1
+  {1},         % T2: solo trabajador 1
+  {1,3},       % T3: trabajadores 1 y 3
+  {4},         % T4: solo trabajador 4
+  {4},         % T5: solo trabajador 4
+  {3}          % T6: solo trabajador 3
+];
 ```
 
 ### 3. Job Shop con Mantenimiento (10 tests)
@@ -188,18 +201,18 @@ Cuatro variaciones con ventanas de mantenimiento en máquinas:
 
 **Formato de datos (.dzn):**
 ```minizinc
-jobs = 3;
-tasks = 3;
-machines = [| 1, 2, 3
-           | 2, 1, 3
-           | 3, 2, 1 |];
-duration = [| 2, 3, 1
-           | 3, 1, 2
-           | 1, 2, 3 |];
-m_windows = 2;  // número de ventanas de mantenimiento
-window_machine = [1, 2];
-window_start = [5, 8];
-window_duration = [2, 3];
+jobs = 5;
+tasks = 5;
+d = [| 1, 4, 5, 3, 6
+     | 3, 2, 7, 1, 2
+     | 4, 4, 4, 4, 4
+     | 1, 1, 1, 6, 8
+     | 7, 3, 2, 2, 1 |];
+% --- Mantenimientos ---
+Nbreaks = 3;           // número de ventanas de mantenimiento
+brk_m = [2, 3, 5];     // máquinas afectadas (número de tarea/columna)
+brk_a = [3, 12, 8];    // inicio del paro
+brk_b = [5, 15, 10];   // fin del paro (duración = brk_b - brk_a)
 ```
 
 ## Características
@@ -230,9 +243,17 @@ window_duration = [2, 3];
 
 ### Exportación
 
-- Exportación de resultados en formato CSV
-- Incluye tiempos de inicio, duraciones y asignaciones
-- Métricas de optimización
+- Exportación de resultados en formatos CSV y PDF
+- **CSV**: Incluye tiempos de inicio, duraciones y asignaciones en formato tabular
+- **PDF**: Documentos profesionales con:
+  - **Metadatos configurados** (título, autor, asunto) - no aparecen como "anonymous"
+  - Información general y métricas de rendimiento
+  - **Diagrama de Gantt interactivo exportado como imagen** (mismo gráfico que se ve en la web)
+  - **Gráficos de comparación de makespan y desbalance** (en PDFs de comparación)
+  - Tiempos de inicio y asignaciones detalladas
+  - Distribución de carga con gráficos de barras
+  - Comparaciones completas con rankings y análisis
+- Nombres de archivo descriptivos según el tipo de modelo
 
 ### Solvers
 
