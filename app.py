@@ -13,6 +13,7 @@ from helpers.data_helper import load_env, allowed_file, get_test_files, parse_du
 from helpers.minizinc_helper import solve_model
 from helpers.visualization_helper import generate_gantt_chart, generate_comparison_chart, generate_imbalance_chart
 from helpers.csv_helper import generate_single_result_csv, generate_comparison_csv
+from helpers.pdf_helper import generate_single_result_pdf, generate_comparison_pdf
 from controllers.controller_oplimit import extract_oplimit_results
 from controllers.controller_workers import extract_workers_results
 from controllers.controller_maintenance import extract_maintenance_results
@@ -28,6 +29,8 @@ app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MODELS_FOLDER'] = MODELS_FOLDER
 app.config['SECRET_KEY'] = 'jobshop-scheduling-secret-key'
+app.config['SESSION_TYPE'] = 'filesystem'
+app.config['PERMANENT_SESSION_LIFETIME'] = 3600  # 1 hora
 
 MODELS = {
     'jobshop_op_limit_1': {
@@ -338,6 +341,25 @@ def export_csv():
     )
 
 
+@app.route('/export_pdf')
+def export_pdf():
+    """Exporta los resultados a PDF"""
+    results = session.get('results', None)
+    if not results:
+        flash('No hay resultados para exportar.', 'error')
+        return redirect(url_for('index'))
+    
+    pdf_buffer = generate_single_result_pdf(results)
+    model_type = results.get('model_type', 'jobshop')
+    filename = f'jobshop_{model_type}_results.pdf'
+    
+    return Response(
+        pdf_buffer.getvalue(),
+        mimetype='application/pdf',
+        headers={'Content-disposition': f'attachment; filename={filename}'}
+    )
+
+
 @app.route('/clear')
 def clear_session():
     """Limpia la sesión actual"""
@@ -364,6 +386,10 @@ def run_comparison():
         flash('Debes seleccionar un test y al menos 2 modelos para comparar.', 'error')
         return redirect(url_for('compare'))
     
+    # IMPORTANTE: Limpiar resultados anteriores de la sesión
+    if 'comparison_results' in session:
+        session.pop('comparison_results', None)
+    
     results_list = run_comparison_parallel(
         selected_models, 
         test_filename, 
@@ -377,20 +403,47 @@ def run_comparison():
         flash('No se obtuvieron resultados de la comparación.', 'error')
         return redirect(url_for('compare'))
     
-    chart_html = generate_comparison_chart(results_list)
-    imbalance_chart_html = generate_imbalance_chart(results_list)
+    # Limpiar resultados para que sean serializables en la sesión
+    serializable_results = []
+    for result in results_list:
+        clean_result = {}
+        for key, value in result.items():
+            # Convertir float('inf') a un valor serializable
+            if isinstance(value, float) and (value == float('inf') or value == float('-inf')):
+                clean_result[key] = 999999 if value == float('inf') else -999999
+            # Convertir listas de numpy a listas de Python si existen
+            elif hasattr(value, 'tolist'):
+                clean_result[key] = value.tolist()
+            else:
+                clean_result[key] = value
+        serializable_results.append(clean_result)
     
-    comparison_results = {
+    comparison_data = {
         'test_file': test_filename,
         'solver': SOLVERS.get(solver_key, solver_key),
-        'results': results_list,
+        'results': serializable_results
+    }
+    
+    # Guardar en sesión y forzar modificación
+    session['comparison_results'] = comparison_data
+    session.modified = True
+    
+    # Debug: verificar qué se guardó
+    print(f"[DEBUG] Guardando comparación en sesión:")
+    print(f"  - Test file: {test_filename}")
+    print(f"  - Número de resultados: {len(serializable_results)}")
+    print(f"  - Modelos: {[r['model_name'] for r in serializable_results]}")
+    
+    chart_html = generate_comparison_chart(serializable_results)
+    imbalance_chart_html = generate_imbalance_chart(serializable_results)
+    
+    comparison_results = {
+        **comparison_data,
         'chart': chart_html,
         'imbalance_chart': imbalance_chart_html
     }
     
-    session['comparison_results'] = comparison_results
-    
-    flash(f'Comparación completada. Mejor resultado: {results_list[0]["model_name"]} con makespan {results_list[0]["makespan"]}', 'success')
+    flash(f'Comparación completada. Mejor resultado: {serializable_results[0]["model_name"]} con makespan {serializable_results[0]["makespan"]}', 'success')
     
     return render_template('compare.html', models=MODELS, solvers=SOLVERS, comparison_results=comparison_results)
 
@@ -399,17 +452,86 @@ def run_comparison():
 def export_comparison_csv():
     """Exporta resultados de comparación a CSV"""
     comparison_results = session.get('comparison_results', None)
+    
+    # Debug: verificar qué hay en la sesión
+    if comparison_results:
+        print(f"[DEBUG] Exportando CSV:")
+        print(f"  - Test file: {comparison_results.get('test_file', 'N/A')}")
+        print(f"  - Número de resultados: {len(comparison_results.get('results', []))}")
+        print(f"  - Modelos: {[r['model_name'] for r in comparison_results.get('results', [])]}")
+    
+    # Debug: verificar si hay datos en la sesión
     if not comparison_results:
-        flash('No hay resultados de comparación para exportar.', 'error')
+        # Intentar mostrar información de debug
+        all_session_keys = list(session.keys())
+        flash(f'No hay resultados de comparación para exportar. Claves en sesión: {all_session_keys}', 'error')
         return redirect(url_for('compare'))
     
-    csv_content = generate_comparison_csv(comparison_results)
+    try:
+        csv_content = generate_comparison_csv(comparison_results)
+        
+        # Agregar timestamp para evitar caché del navegador
+        timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f'comparison_{comparison_results["test_file"]}_{timestamp}.csv'
+        
+        response = Response(
+            csv_content,
+            mimetype='text/csv',
+            headers={
+                'Content-disposition': f'attachment; filename={filename}',
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0'
+            }
+        )
+        return response
+    except Exception as e:
+        flash(f'Error al generar CSV: {str(e)}', 'error')
+        return redirect(url_for('compare'))
+
+
+@app.route('/export_comparison_pdf')
+def export_comparison_pdf():
+    """Exporta resultados de comparación a PDF"""
+    comparison_results = session.get('comparison_results', None)
     
-    return Response(
-        csv_content,
-        mimetype='text/csv',
-        headers={'Content-disposition': f'attachment; filename=comparison_{comparison_results["test_file"]}.csv'}
-    )
+    # Debug: verificar qué hay en la sesión
+    if comparison_results:
+        print(f"[DEBUG] Exportando PDF:")
+        print(f"  - Test file: {comparison_results.get('test_file', 'N/A')}")
+        print(f"  - Número de resultados: {len(comparison_results.get('results', []))}")
+        print(f"  - Modelos: {[r['model_name'] for r in comparison_results.get('results', [])]}")
+    
+    # Debug: verificar si hay datos en la sesión
+    if not comparison_results:
+        all_session_keys = list(session.keys())
+        flash(f'No hay resultados de comparación para exportar. Claves en sesión: {all_session_keys}', 'error')
+        return redirect(url_for('compare'))
+    
+    try:
+        pdf_buffer = generate_comparison_pdf(comparison_results)
+        test_file = comparison_results.get('test_file', 'comparison')
+        
+        # Agregar timestamp para evitar caché del navegador
+        timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f'comparison_{test_file}_{timestamp}.pdf'
+        
+        response = Response(
+            pdf_buffer.getvalue(),
+            mimetype='application/pdf',
+            headers={
+                'Content-disposition': f'attachment; filename={filename}',
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0'
+            }
+        )
+        return response
+    except Exception as e:
+        flash(f'Error al generar PDF: {str(e)}', 'error')
+        import traceback
+        print(traceback.format_exc())
+        return redirect(url_for('compare'))
 
 
 if __name__ == '__main__':
