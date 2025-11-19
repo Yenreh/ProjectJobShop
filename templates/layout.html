@@ -12,29 +12,51 @@
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-<nav class="navbar navbar-expand navbar-dark bg-dark shadow-sm">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="{{ url_for('index') }}">
-            <i class="bi bi-calendar3"></i> Job Shop Scheduler
+<!-- Modern Header/Navbar -->
+<nav class="navbar navbar-expand-lg navbar-dark modern-navbar sticky-top">
+    <div class="container-fluid px-4">
+        <a class="navbar-brand d-flex align-items-center" href="{{ url_for('index') }}">
+            <div class="brand-icon-wrapper">
+                <i class="bi bi-boxes brand-icon"></i>
+            </div>
+            <span class="brand-text">
+                <span class="brand-main">Job Shop</span>
+                <span class="brand-sub">Scheduler</span>
+            </span>
         </a>
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+        
+        <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
             <span class="navbar-toggler-icon"></span>
         </button>
+        
         <div class="collapse navbar-collapse" id="navbarNav">
-            <ul class="navbar-nav ms-auto">
+            <ul class="navbar-nav ms-auto gap-2 align-items-center">
                 <li class="nav-item">
-                    <a class="nav-link" href="{{ url_for('index') }}">
-                        <i class="bi bi-house"></i> Inicio
+                    <a class="nav-link modern-nav-link {% if request.endpoint == 'index' %}active{% endif %}" href="{{ url_for('index') }}">
+                        <i class="bi bi-play-circle-fill"></i>
+                        <div class="nav-link-content">
+                            <span class="nav-link-title">Ejecutar Modelo</span>
+                            <small class="nav-link-subtitle">Resolver problema individual</small>
+                        </div>
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="{{ url_for('compare') }}">
-                        <i class="bi bi-bar-chart-line"></i> Comparar
+                    <a class="nav-link modern-nav-link {% if request.endpoint == 'compare' %}active{% endif %}" href="{{ url_for('compare') }}">
+                        <i class="bi bi-graph-up-arrow"></i>
+                        <div class="nav-link-content">
+                            <span class="nav-link-title">Comparar Modelos</span>
+                            <small class="nav-link-subtitle">Análisis comparativo</small>
+                        </div>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="btn btn-clear-session" href="{{ url_for('clear_session') }}" title="Limpiar datos de sesión">
+                        <i class="bi bi-trash3"></i>
                     </a>
                 </li>
             </ul>
@@ -42,14 +64,16 @@
     </div>
 </nav>
 
-<main class="container my-4">
+<main class="container my-5">
     {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
-    <div class="flash-messages">
+    <div class="flash-messages mb-4">
         {% for category, message in messages %}
-        <div class="alert alert-{{ 'success' if category == 'success' else 'danger' if category == 'error' else 'info' }} alert-dismissible fade show" role="alert">
-            <i class="bi bi-{{ 'check-circle' if category == 'success' else 'exclamation-triangle' if category == 'error' else 'info-circle' }}"></i>
-            {{ message }}
+        <div class="alert modern-alert alert-{{ 'success' if category == 'success' else 'danger' if category == 'error' else 'info' }} alert-dismissible fade show" role="alert">
+            <div class="d-flex align-items-center">
+                <i class="bi bi-{{ 'check-circle-fill' if category == 'success' else 'exclamation-triangle-fill' if category == 'error' else 'info-circle-fill' }} me-3 fs-4"></i>
+                <div>{{ message }}</div>
+            </div>
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
         {% endfor %}
@@ -59,11 +83,38 @@
     {% block content %}{% endblock %}
 </main>
 
-<footer class="footer mt-auto py-3 bg-light">
-    <div class="container text-center">
-        <span class="text-muted">
-            <i class="bi bi-code-slash"></i> Desarrollado con Flask, MiniZinc y Plotly | Programación por Restricciones 2025
-        </span>
+<!-- Modern Footer -->
+<footer class="modern-footer">
+    <div class="footer-content">
+        <div class="container">
+            <div class="row align-items-center py-4">
+                <div class="col-md-4 text-center text-md-start mb-3 mb-md-0">
+                    <div class="foote-brand">
+                        <span>Job Shop Scheduler</span>
+                    </div>
+                </div>
+                <div class="col-md-4 text-center mb-3 mb-md-0">
+                    <div class="footer-tech">
+                        <span class="tech-badge">Flask</span>
+                        <span class="tech-badge">MiniZinc</span>
+                        <span class="tech-badge">Plotly</span>
+                    </div>
+                </div>
+                <div class="col-md-4 text-center text-md-end">
+                        <span>Programación por Restricciones</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="footer-bottom">
+        <div class="container">
+            <div class="row">
+                <div class="col text-center py-2">
+                    <small>Universidad Del Valle 2025</small>
+                </div>
+            </div>
+        </div>
     </div>
 </footer>
 
