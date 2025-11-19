@@ -111,21 +111,36 @@
                     </div>
                 </div>
 
-                <button type="submit" class="btn btn-primary btn w-100">
+                <div id="loading-indicator-compare" class="alert alert-info" style="display: none;">
+                    <div class="d-flex align-items-center">
+                        <div class="spinner-border spinner-border-sm me-2" role="status">
+                            <span class="visually-hidden">Cargando...</span>
+                        </div>
+                        <strong>Ejecutando comparación...</strong> Esto puede tardar varios minutos dependiendo de los modelos seleccionados.
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn w-100" id="compare-btn">
                     <i class="bi bi-play-circle"></i> Ejecutar Comparación
                 </button>
             </form>
         </div>
     </div>
 
+    <div id="results-container">
     {% if comparison_results %}
     <!-- Resultados de comparación -->
     <div class="card shadow-sm mb-4">
         <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
             <h5 class="mb-0"><i class="bi bi-trophy"></i> Resultados de la Comparación</h5>
-            <a href="{{ url_for('export_comparison_csv') }}" class="btn btn-light">
-                <i class="bi bi-download"></i> Exportar CSV
-            </a>
+            <div>
+                <a href="{{ url_for('export_comparison_csv') }}" class="btn btn-light me-2">
+                    <i class="bi bi-download"></i> Exportar CSV
+                </a>
+                <a href="{{ url_for('export_comparison_pdf') }}" class="btn btn-danger">
+                    <i class="bi bi-file-pdf"></i> Exportar PDF
+                </a>
+            </div>
         </div>
         <div class="card-body">
             <div class="alert alert-info">
@@ -301,12 +316,17 @@
         </div>
     </div>
     {% endif %}
+    </div>
 </div>
 
 <script>
 // Cargar tests disponibles (usando primer modelo op_limit por defecto)
 const testSelect = document.getElementById('test-file-compare');
 const modelCheckboxes = document.querySelectorAll('.model-checkbox');
+const compareForm = document.getElementById('compare-form');
+const loadingIndicator = document.getElementById('loading-indicator-compare');
+const compareBtn = document.getElementById('compare-btn');
+const resultsContainer = document.getElementById('results-container');
 
 // Función para manejar la selección de modelos por tipo
 function handleModelSelection() {
@@ -341,6 +361,21 @@ function handleModelSelection() {
 modelCheckboxes.forEach(checkbox => {
     checkbox.addEventListener('change', handleModelSelection);
 });
+
+// Manejar envío del formulario
+if (compareForm) {
+    compareForm.addEventListener('submit', function() {
+        // Ocultar resultados anteriores
+        if (resultsContainer) {
+            resultsContainer.style.display = 'none';
+        }
+        
+        // Mostrar indicador de carga
+        loadingIndicator.style.display = 'block';
+        compareBtn.disabled = true;
+        compareBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Ejecutando...';
+    });
+}
 
 async function loadTests() {
     try {
