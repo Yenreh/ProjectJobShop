@@ -264,8 +264,7 @@ La aplicación soporta múltiples solvers:
 
 ## Archivos de Prueba
 
-El directorio `models/tests/` contiene archivos de ejemplo:
-- `data00.dzn` - `data04.dzn`: Instancias para operarios limitados
+El directorio `models/<model_name>/tests/` contiene archivos de ejemplo:
 - `data_01.dzn` - `data_05.dzn`: Instancias para habilidades de operarios
 
 ## Desarrollo
@@ -283,14 +282,6 @@ El directorio `models/tests/` contiene archivos de ejemplo:
 2. Agregar entrada en el diccionario `MODELS` en `app.py`
 3. Definir tipo de modelo: `'op_limit'` o `'workers_skills'`
 4. Opcionalmente ajustar procesamiento de resultados
-
-## Créditos
-
-Proyecto desarrollado para el curso de Programación por Restricciones, 2025.
-
-**Autor**: [Tu nombre]  
-**Profesor**: Robinson Duque  
-**Universidad**: [Tu universidad]
 
 ## Licencia
 
