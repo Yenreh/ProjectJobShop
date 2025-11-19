@@ -44,7 +44,7 @@ def run_single_model_comparison(model_key, test_filename, solver_key, timeout, m
             'model_name': model_info['name'],
             'category': model_info['category'],
             'model_type': model_type,
-            'makespan': float('inf'),
+            'makespan': 999999,  # Usar valor grande en lugar de inf
             'execution_time': 'N/A',
             'status': 'ERROR: Test file not found',
             'success': False,
@@ -109,7 +109,7 @@ def run_single_model_comparison(model_key, test_filename, solver_key, timeout, m
                 'model_name': model_info['name'],
                 'category': model_info['category'],
                 'model_type': model_type,
-                'makespan': float('inf'),
+                'makespan': 999999,  # Usar valor grande en lugar de inf
                 'execution_time': 'N/A',
                 'status': str(result.status).replace('Status.', ''),
                 'success': False
@@ -121,7 +121,7 @@ def run_single_model_comparison(model_key, test_filename, solver_key, timeout, m
             'model_name': model_info['name'],
             'category': model_info['category'],
             'model_type': model_type,
-            'makespan': float('inf'),
+            'makespan': 999999,  # Usar valor grande en lugar de inf
             'execution_time': 'Error',
             'status': f'ERROR: {str(e)[:50]}',
             'success': False,
