@@ -2,6 +2,12 @@
 
 Herramienta interactiva para resolver problemas de Job Shop Scheduling Problem (JSSP) utilizando Programación por Restricciones con MiniZinc.
 
+## Video Demostrativo
+
+🎥 **[Ver demostración de la aplicación](https://drive.google.com/file/d/1JnkkUlVxI55IbBqWTS9e4VfoJkSX2KPz/view?usp=sharing)**
+
+*Enlace al video demostrativo mostrando las funcionalidades principales de la herramienta.*
+
 ## Descripción
 
 Esta aplicación web permite ejecutar modelos de Programación por Restricciones para resolver instancias del Job Shop Scheduling Problem con diferentes variaciones:
